@@ -1,0 +1,41 @@
+name: Build Sideloadable IPA
+on: workflow_dispatch
+
+jobs:
+  build-ios:
+    runs-on: macos-15
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Go Environment
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+
+      - name: Build Go Framework
+        run: ./scripts/build-rclone.sh
+
+      - name: Compile App Bundle
+        run: |
+          xcodebuild -project *.xcodeproj \
+                     -scheme rclone-gui-ios \
+                     -configuration Release \
+                     -sdk iphoneos \
+                     -derivedDataPath build \
+                     CODE_SIGN_IDENTITY="" \
+                     CODE_SIGNING_REQUIRED=NO \
+                     CODE_SIGNING_ALLOWED=NO \
+                     clean build
+
+      - name: Package into IPA
+        run: |
+          mkdir -p Payload
+          cp -r build/Build/Products/Release-iphoneos/*.app Payload/
+          zip -r rclone-gui.ipa Payload
+
+      - name: Upload Finished Build
+        uses: actions/upload-artifact@v4
+        with:
+          name: rclone-gui-sideload
+          path: rclone-gui.ipa
